@@ -1,0 +1,267 @@
+---
+title: "STAT 5014 HW7"
+author: "Max McGill"
+date: '`r Sys.Date()`'
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache=T, tidy.opts=list(width.cutoff=55),
+                tidy=T, message=F, warning=F)
+    library.warn <- library
+    library <- function(package, help, pos = 2, lib.loc = NULL, character.only = FALSE,
+                        logical.return = FALSE, warn.conflicts = FALSE, quietly = TRUE,
+                        verbose = getOption("verbose")) {
+       if (!character.only) {
+          package <- as.character(substitute(package))
+       }
+       suppressPackageStartupMessages(library.warn(
+          package, help, pos, lib.loc, character.only = TRUE,
+          logical.return, warn.conflicts, quietly, verbose))}
+    
+    fig <- local({
+    i <- 0
+    ref <- list()
+    list(
+        cap=function(refName, text) {
+            i <<- i + 1
+            ref[[refName]] <<- i
+            text
+        },
+        ref=function(refName) {
+            ref[[refName]]
+        })
+})
+```
+
+## **Problem 2: Sums of Squares**
+
+### **Part A: For Loop**
+
+```{r, echo=F}
+#generate data
+set.seed(12345)
+y <- rnorm(n = 1e7, mean = 1, sd = 1)
+
+#part a: for loop
+SSTa<-0
+t1<-system.time({
+    ybar<-mean(y)
+    for(i in 1:1e7){
+        SSTa <- SSTa + (y[i]-ybar)^2
+    }
+})
+knitr::kable(cbind(SSTa,t1["user.self"],t1["sys.self"],t1["elapsed"]),col.names=c('SST','User','System','Elapsed'),caption="Timed For Loop")
+```
+
+### **Part B: Vector Operations**
+
+```{r, echo=F}
+#Part b: vector operations
+SSTb <- 0
+t2 <- system.time({
+    y_star <- (y-mean(y))
+    SSTb <- crossprod(y_star)
+    })
+knitr::kable(cbind(SSTb,t2["user.self"],t2["sys.self"],t2["elapsed"]),col.names=c('SST','User','System','Elapsed'),caption="Vector Operations")
+```
+
+### **Part C: dopar**
+
+It takes too long for my computer. The code is in the Appendix.
+
+```{r, echo=F, eval=F}
+#packages
+library(foreach)
+library(doParallel)
+library(parallel)
+
+#Part c: dopar
+c1<-makeCluster(2)
+registerDoParallel(c1)
+system.time(
+  SSTc<-foreach(i=1:length(y), .combine='+') %dopar% ((y[i]-ybar)^2)
+)
+stopCluster(c1)
+knitr::kable(cbind(SSTc,t2["user.self"],t2["sys.self"],t2["elapsed"]),col.names=c('SST','User','System','Elapsed'),caption="dopar")
+```
+
+### **Part D: parSapply**
+
+It takes too long for my computer. The code is in the Appendix.
+
+```{r, echo=F, eval=F}
+
+#Part d: parSapply
+sstfunc<-function(y){
+  SSTdv <- c()
+  for(i in 1:length(y)){
+    SSTd[i] <- (y[i]-mean(y))^2
+  }
+  return(SSTd)
+}
+cl <- makeCluster(2)
+clusterExport(cl,"sstfunc")
+system.time({
+    SSTd <- parSapply(cl, 1:length(y),
+            function(y) sstfunc,USE.NAMES = F)
+})
+stopCluster(cl)
+knitr::kable(cbind(SSTd,t2["user.self"],t2["sys.self"],t2["elapsed"]),col.names=c('SST','User','System','Elapsed'),caption="parSapply")
+
+
+```
+
+
+## **Problem 3: Gradient Descent**
+
+```{r, echo=F}
+#object designation
+    set.seed(1256)
+    theta <- as.matrix(c(1,2),nrow=2)
+    X <- cbind(1,rep(1:10,10))
+    h <- X%*%theta+rnorm(100,0,0.2)
+#more objects
+    thetanew<-as.matrix(c(0,0),nrow=2)
+    alpha<-0.05
+    m<-length(h)
+    tol<-0.1
+
+#the computation
+for(i in 1:m){
+  while(abs(thetanew[1]-theta[1])>tol && abs(thetanew[2]-theta[2])>tol){
+    thetanew[1]<-theta[1]-alpha/m*sum(thetanew[1]+thetanew[2]*X[i,2]-h[i])
+    thetanew[2]<-theta[2]-alpha/m*sum((theta[1]+theta[2]*X[i,2]-h[i])*X[i,2])  
+    }
+}
+thetanew
+
+#for comparison
+lm(h~0+X)
+```
+
+Here we have the result obtained from the method, which is followed by the result from using the linear model function.
+
+## **Problem 4: Bootstrapped Regression**
+
+I couldn't get this bootstrap to work in time, having run into problems coordinating the dimensionality and applying parallelization. The code is in the Appendix. 
+
+```{r, echo=F, eval=F}
+#from assignment
+    set.seed(1267)
+    n <- 200
+    X <- 1/cbind(1,rt(n,df=1),rt(n,df=1),rt(n,df=1))
+    beta <- c(1,2,3,0)
+    Y <- X %*% beta + rnorm(100,sd=3)
+#bootstrap
+B<-10000
+Ymat<-matrix(rep(Y,4),4*n,4)
+bootbeta<-matrix(0,4*B,4)
+for(b in 1:B){
+  bootid<-sample(1:n,n,replace=T)
+  bootx<-X[bootid,]
+  booty<-Ymat[bootid,]
+  bootbeta[b]<-coef(lm(booty~bootx))
+}
+knitr::kable(summary(lm(Y~X))$coefficients, caption="Summary of Bootstrap Model Parameters")
+```
+
+## **Appendix 1: R Code**
+```{r, eval=F, include=T}
+##problem 2
+set.seed(12345)
+y <- rnorm(n = 1e7, mean = 1, sd = 1)
+
+#part a: for loop
+SSTa<-0
+t1<-system.time({
+    ybar<-mean(y)
+    for(i in 1:1e7){
+        SSTa <- SSTa + (y[i]-ybar)^2
+    }
+})
+knitr::kable(cbind(SSTa,t1["user.self"],t1["sys.self"],t1["elapsed"]),col.names=c('SST','User','System','Elapsed'),caption="Timed For Loop")
+
+#part b: vector operations
+SSTb <- 0
+t2 <- system.time({
+    y_star <- (y-mean(y))
+    SSTb <- crossprod(y_star)
+    })
+knitr::kable(cbind(SSTb,t2["user.self"],t2["sys.self"],t2["elapsed"]),col.names=c('SST','User','System','Elapsed'),caption="Vector Operations")
+
+#packages
+library(foreach)
+library(doParallel)
+library(parallel)
+
+#Part c: dopar
+c1<-makeCluster(2)
+registerDoParallel(c1)
+system.time(
+  SSTc<-foreach(i=1:length(y), .combine='+') %dopar% ((y[i]-ybar)^2)
+)
+stopCluster(c1)
+knitr::kable(cbind(SSTc,t2["user.self"],t2["sys.self"],t2["elapsed"]),col.names=c('SST','User','System','Elapsed'),caption="dopar")
+
+#Part d: parSapply
+sstfunc<-function(y){
+  SSTdv <- c()
+  for(i in 1:length(y)){
+    SSTd[i] <- (y[i]-mean(y))^2
+  }
+  return(SSTd)
+}
+cl <- makeCluster(2)
+clusterExport(cl,"sstfunc")
+system.time({
+    SSTd <- parSapply(cl, 1:length(y),
+            function(y) sstfunc,USE.NAMES = F)
+})
+stopCluster(cl)
+knitr::kable(cbind(SSTd,t2["user.self"],t2["sys.self"],t2["elapsed"]),col.names=c('SST','User','System','Elapsed'),caption="parSapply")
+
+##problem 3
+#object designation
+    set.seed(1256)
+    theta <- as.matrix(c(1,2),nrow=2)
+    X <- cbind(1,rep(1:10,10))
+    h <- X%*%theta+rnorm(100,0,0.2)
+#more objects
+    thetanew<-as.matrix(c(0,0),nrow=2)
+    alpha<-0.05
+    m<-length(h)
+    tol<-0.1
+
+#the computation
+for(i in 1:m){
+  while(abs(thetanew[1]-theta[1])>tol && abs(thetanew[2]-theta[2])>tol){
+    thetanew[1]<-theta[1]-alpha/m*sum(thetanew[1]+thetanew[2]*X[i,2]-h[i])
+    thetanew[2]<-theta[2]-alpha/m*sum((theta[1]+theta[2]*X[i,2]-h[i])*X[i,2])  
+    }
+}
+thetanew
+
+#for comparison
+lm(h~0+X)
+
+##problem 4
+#from assignment
+    set.seed(1267)
+    n <- 200
+    X <- 1/cbind(1,rt(n,df=1),rt(n,df=1),rt(n,df=1))
+    beta <- c(1,2,3,0)
+    Y <- X %*% beta + rnorm(100,sd=3)
+#bootstrap
+B<-10000
+Ymat<-matrix(rep(Y,4),4*n,4)
+bootbeta<-matrix(0,4*B,4)
+for(b in 1:B){
+  bootid<-sample(1:n,n,replace=T)
+  bootx<-X[bootid,]
+  booty<-Ymat[bootid,]
+  bootbeta[b]<-coef(lm(booty~bootx))
+}
+knitr::kable(summary(lm(Y~X))$coefficients, caption="Summary of Bootstrap Model Parameters")
+```
+
