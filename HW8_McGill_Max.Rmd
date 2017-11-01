@@ -1,0 +1,592 @@
+---
+title: "STAT 5014 HW8"
+author: "Max McGill"
+date: '`r Sys.Date()`'
+output: html_notebook
+---
+
+```{r setup, include=F}
+knitr::opts_chunk$set(echo = TRUE, cache=T, tidy.opts=list(width.cutoff=55),
+                tidy=T, message=F, warning=F)
+    library.warn <- library
+    library <- function(package, help, pos = 2, lib.loc = NULL, character.only = FALSE,
+                        logical.return = FALSE, warn.conflicts = FALSE, quietly = TRUE,
+                        verbose = getOption("verbose")) {
+       if (!character.only) {
+          package <- as.character(substitute(package))
+       }
+       suppressPackageStartupMessages(library.warn(
+          package, help, pos, lib.loc, character.only = TRUE,
+          logical.return, warn.conflicts, quietly, verbose))}
+    
+    fig <- local({
+    i <- 0
+    ref <- list()
+    list(
+        cap=function(refName, text) {
+            i <<- i + 1
+            ref[[refName]] <<- i
+            text
+        },
+        ref=function(refName) {
+            ref[[refName]]
+        })
+})
+    
+#load packages
+    library(ggplot2)
+    library(ggExtra)
+    library(MASS)
+    library(dplyr)
+    library(tidyr)
+    library(tidytext)
+    library(stringr)
+    library(scales)
+    library(wordcloud)
+```
+
+## **Problem 2: Class Data**
+
+```{r, echo=F}
+##Problem 2
+
+#get data
+cd<-read.delim("./survey_data.txt")
+cddf<-data.frame(cd)
+text<-c()
+for(i in 1:length(cddf[1,])){
+  text[i]<-paste(as.character(cddf[1:length(cddf[,i]),i]),sep=" ",collapse=" ")
+}
+cdtdf<-data_frame(text=text)
+cdtdf1<-data_frame(text=text[1])
+cdtdf2<-data_frame(text=text[2])
+cdtdf3<-data_frame(text=text[3])
+cdtdf4<-data_frame(text=text[4])
+
+#create function to clean text
+#inspired by http://www.mjdenny.com/Text_Processing_In_R.html
+cleantext<-function(t){
+    # Lowercase
+    temp<-tolower(t)
+    #' Remove everything that is not a number or letter (may want to keep more 
+    #' stuff in your actual analyses). 
+    temp<-stringr::str_replace_all(temp,"[^a-zA-Z\\s]", " ")
+    # Shrink down to just one white space
+    temp<-stringr::str_replace_all(temp,"[\\s]+", " ")
+    # Split it
+    #temp<-stringr::str_split(temp, " ")[[1]]
+    # Get rid of trailing "" if necessary
+    indexes<-which(temp == "")
+    if(length(indexes) > 0){
+      temp<-temp[-indexes]
+    } 
+    return(temp)
+}
+#clean text
+ctdf1<-cleantext(cdtdf1)
+ctdf2<-cleantext(cdtdf2)
+ctdf3<-cleantext(cdtdf3)
+ctdf4<-cleantext(cdtdf4)
+
+#remove/convert noise data from major
+ctdf1<-gsub("bs ","",ctdf1)
+ctdf1<-gsub("ms ","",ctdf1)
+ctdf1<-gsub("engineer","engineering",ctdf1)
+ctdf1<-gsub("mechanical eng","engineering",ctdf1)
+ctdf1<-gsub("finance finance","finance",ctdf1)
+ctdf1<-gsub("master ","",ctdf1)
+#remove noise data from platform
+ctdf2<-gsub("surface ","",ctdf2)
+#remove/convert noise data from R level
+ctdf3<-gsub("int ","intermediate ",ctdf3)
+ctdf3<-gsub("intermed ","intermediate ",ctdf3)
+ctdf3<-gsub("beg ","beginner ",ctdf3)
+#remove/convert noise data from other programming
+ctdf4<-gsub("just ","",ctdf4)
+ctdf4<-gsub("some ","",ctdf4)
+ctdf4<-gsub("and ","",ctdf4)
+ctdf4<-gsub("obj c","obj-c",ctdf4)
+ctdf4<-gsub(" c"," c++",ctdf4)
+ctdf4<-gsub("teeny amount of ","",ctdf4)
+
+#reset as data frames
+df1<-data_frame(text=ctdf1)
+df2<-data_frame(text=ctdf2)
+df3<-data_frame(text=ctdf3)
+df4<-data_frame(text=ctdf4)
+#tokenize
+untext1<-df1 %>%
+        unnest_tokens(word, text)
+untext2<-df2 %>%
+        unnest_tokens(word, text)
+untext3<-df3 %>%
+        unnest_tokens(word, text)
+untext4<-df4 %>%
+        unnest_tokens(word, text)
+
+
+#bar graphs
+bg1<-untext1 %>%
+  count(word, sort = TRUE) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n,fill=word)) +
+  geom_col() +
+  xlab(NULL) +
+  ylab("Frequency") +
+  coord_flip() +
+  ggtitle("Majors") +
+  theme(legend.position="none")
+bg2<-untext2 %>%
+  count(word, sort = TRUE) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n,fill=word)) +
+  geom_col() +
+  xlab(NULL) +
+  ylab("Frequency") +
+  coord_flip() +
+  ggtitle("Platforms") +
+  theme(legend.position="none")
+bg3<-untext3 %>%
+  count(word, sort = TRUE) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n,fill=word)) +
+  geom_col() +
+  xlab(NULL) +
+  ylab("Frequency") +
+  coord_flip() +
+  ggtitle("R Proficiency Levels") +
+  theme(legend.position="none")
+bg4<-untext4 %>%
+  count(word, sort = TRUE) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n,fill=word)) +
+  geom_col() +
+  xlab(NULL) +
+  ylab("Frequency") +
+  coord_flip() +
+  ggtitle("Other Proficiencies") +
+  theme(legend.position="none")
+```
+
+```{r, echo=F}
+#bar graph of majors
+bg1
+```
+
+From what can be seen from the frequencies of majors in the survey, most of the class listed that they had a background in mathematics at ten students, followed by statistics at seven and further by economics at three.
+Finance and engineering backgrounds appeared twice each, and only one student each listed that they had a background in history or DAAS.
+It should be noted that a number of students listed multiple majors, indicating that these frequencies refer only to how many students listed a background in a specific field, not the number of students with a specific combination of majors in their academic background.  
+
+```{r, echo=F}
+#bar graph of platforms
+bg2
+```
+
+As can be seen above, most of the class uses a PC at twelve students, with only three students using a MAC.
+
+```{r, echo=F}
+#bar graph of R level
+bg3
+```
+
+At the beginning of the class, ten students wrote that they considered themselves a beginner with R, seven called themselves intermediate, and no one considered themselves an expert.
+Considering there are only fifteen entries in the data set, it should be noted that this analysis only considers the frequency with which students listed themselves at one of the three levels.
+Two students considered themselves to be somewhere between beginner and intermediate, a designation which is considered as both options here.
+
+```{r, echo=F}
+#bar graph of other programming
+bg4
+```
+
+From the graph, it can be seen that many students in the class have had at least some experience in SAS, at a frequency of nine, followed by Python and Matlab at frequencies of six each.
+Five students said they have experience with Java, four with C++, two each with SQL and Minitab, and only one each with SPSS, Obj-C, and Linux.
+One student listed R, even considering the segment was asking for other programming experience, and four students considered themselves to have no or very little experience with any other software.
+
+```{r, echo=F}
+#wordclouds
+pal1<-brewer.pal(7,"Dark2")
+pal2<-brewer.pal(12,"Paired")
+par(mfcol=c(1,2))
+wordcloud(ctdf1,min.freq=1,max.words=Inf,random.order=F,colors=pal1)
+wordcloud(ctdf4,min.freq=1,max.words=Inf,random.order=F,colors=pal2)
+```
+
+The wordclouds above reiterate what was shown in the bar graphs of prior majors and proficiencies.
+In the clouds here, words are distributed and sized by their relative frequencies, with the largest and most central being most frequent.
+In turn, the words are colored by their size, such that identical coloration implies identical frequencies.
+As such, the vast majority of academic backgrounds among the class are in mathematics or statistics, and most of the students have some proficiency with SAS, Python, or Matlab.
+
+## **Problem 3: Case Study**
+
+In this case study, I take the data used in the eighth chapter "mining NASA metadata", and apply the sentiment analysis methods of the ninth chapter case study, "analyzing usenet text", to the file descriptions as sorted by their keywords.
+This serves the purpose of analyzing the potential sentiment of files involving each topic in the provided NASA database.
+
+The first portion is fairly straightforward and generally follows the same data pre-processing procedures as the chapter eight case study.
+
+```{r, echo=F}
+##Problem 3
+
+#get data
+library(jsonlite)
+metadata <- fromJSON("https://data.nasa.gov/data.json")
+#metadata sorting
+names(metadata$dataset)
+```
+
+First, the metadata from NASA is loaded into R and the names of the data involved are displayed.
+While the original case study used the "title", "description", and "keyword" data, only the latter two are necessary here. 
+
+```{r, echo=F}
+#investigation of object classes
+class(metadata$dataset$description)
+class(metadata$dataset$keyword)
+```
+
+In checking the classes of the desired objects, it is found, as in the original case study, that the descriptions are stored as a character and the keywords as a list of characters.
+
+```{r, echo=F}
+#quick tidying for
+#descriptions
+nasa_desc <- data_frame(id = metadata$dataset$`_id`$`$oid`, 
+                        desc = metadata$dataset$description)
+
+nasa_desc %>% 
+  select(desc) %>% 
+  sample_n(2)
+#keywords
+nasa_keyword <- data_frame(id = metadata$dataset$`_id`$`$oid`, 
+                           keyword = metadata$dataset$keyword) %>%
+  unnest(keyword)
+
+nasa_keyword
+```
+
+The data are converted into the tidy format and previewed here, as an exceptionally small sample of descriptions and a table of keywords with their identification codes.
+
+```{r, echo=F}
+#remove stopwords from descriptions
+nasa_desc <- nasa_desc %>% 
+  unnest_tokens(word, desc) %>% 
+  anti_join(stop_words)
+#define more stopwords
+my_stopwords <- data_frame(word = c(as.character(1:10), 
+                                    "v1", "v03", "l2", "l3", "l4", "v5.2.0", 
+                                    "v003", "v004", "v005", "v006", "v7"))
+#remove them
+nasa_desc <- nasa_desc %>% 
+  anti_join(my_stopwords)
+#eliminate the lower case among keywords
+nasa_keyword <- nasa_keyword %>% 
+  mutate(keyword = toupper(keyword))
+```
+
+Next, the stopwords excluded in the original study are identified and removed.
+In addition, the keywords are converted into a format of entirely uppercase letters to avoid duplicates of differing situations of letter case.
+The code involved is viewable in Appendix 1.
+
+```{r, echo=F}
+#exploratory frequencies
+nasa_desc %>%
+  count(word, sort = TRUE)
+nasa_keyword %>% 
+  group_by(keyword) %>% 
+  count(sort = TRUE)
+```
+
+In an exploratory view of the textual data, tables of the frequencies with which each word of the file descriptions and each keyword to define the files are created and presented above.
+As can be seen within them, a vast majority of files are categorized as "EARTH SCIENCE" or "OCEANS".
+Unsurprisingly given those key terms, the categories of "OCEAN OPTICS" and "OCEAN COLOR" follow only 3000 mentions behind, accompanied by "PROJECT" and "ATMOSPHERE".
+Considering the nature of these files, "data"'s dominating prominence among the descriptions' vocabulary is no surprise.
+
+```{r, echo=F}
+#merge description and keyword by id
+desckey<-merge(nasa_desc,nasa_keyword,by="id")
+head(desckey)
+```
+
+Now, in order to perform the sentiment analysis by the variable of keywords, the data must be merged into a single data frame, united by the identification codes that remained in the original sets.
+Its first few rows are shown above.
+
+```{r, echo=F}
+#find description word frequencies by keywords
+desc_by_keyword <- desckey %>%
+  count(keyword, word, sort = TRUE) %>%
+  ungroup()
+desc_by_keyword
+```
+
+In another step of preparation, the new data frame is converted to involve a measure of frequencies.
+Once again, the result is shown above.
+
+```{r, echo=F}
+#tally sentiment scores
+nasa_sentiments <- desc_by_keyword %>%
+  inner_join(get_sentiments("afinn"), by = "word") %>%
+  group_by(keyword) %>%
+  summarize(score = sum(score * n) / sum(n))
+#plot sentiment scores
+nasa_sentiments %>%
+  mutate(keyword = reorder(keyword, score)) %>%
+  ggplot(aes(keyword, score, fill = score > 0)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  ylab("Average Sentiment Score")
+```
+
+Using the code from the case study of chapter nine, as well as the sentimentality measures from the AFINN lexicon, the sentiment scores are tallied for the collective descriptions of each keyword, judging the sentiments of all major topics.
+The plot of sentiment scores shown here presents each keyword topic in descending order of their descriptions' collective sentimental positivity.
+Unfortunately, the immense size of the vocabulary of keyword subjects creates a degree of unwieldiness in the plot.
+However, without subsetting and replotting, conclusions can still be drawn that the overwhelming majority of keyword subjects convey a positive sentiment, whereas only a relative few harbor a negative one.
+Still, the most sentimentally charged descriptions fall under the branch of negativity, while the mass of positive ones are less intensely charged, going by the lexicon's judgments.
+
+```{r, echo=F}
+#tally contributions by word
+contributions <- desckey %>%
+  inner_join(get_sentiments("afinn"), by = "word") %>%
+  group_by(word) %>%
+  summarize(occurences = n(),
+            contribution = sum(score))
+contributions
+#plot contributions
+contributions %>%
+  top_n(25, abs(contribution)) %>%
+  mutate(word = reorder(word, contribution)) %>%
+  ggplot(aes(word, contribution, fill = contribution > 0)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip()
+```
+
+Finally, the tally of sentiment contribution for each thusly charged word is calculated and presented in the table above.
+The most influential contributors among the descriptions' collective vocabulary are presented in the plot shown here.
+Although most of the words are particularly surprising in their presence or degree of contribution, it is notable how greatly "improve" and "pressure" affected the scores of their keywords.
+While "improve" is an almost universally positive term, "pressure" is not typically a negative one within the assumed context of NASA's files.
+It's likely that the different meanings of "pressure", which are dependent on both its contextual and grammatical usage, may have had a pronounced effect the outcome of the sentiment analysis, especially given the significance it's presented with here.
+
+## **Appendix 1: R Code**
+
+```{r, eval=F}
+##Problem 2
+
+#get data
+cd<-read.delim("./survey_data.txt")
+cddf<-data.frame(cd)
+text<-c()
+for(i in 1:length(cddf[1,])){
+  text[i]<-paste(as.character(cddf[1:length(cddf[,i]),i]),sep=" ",collapse=" ")
+}
+cdtdf<-data_frame(text=text)
+cdtdf1<-data_frame(text=text[1])
+cdtdf2<-data_frame(text=text[2])
+cdtdf3<-data_frame(text=text[3])
+cdtdf4<-data_frame(text=text[4])
+
+#create function to clean text
+#inspired by http://www.mjdenny.com/Text_Processing_In_R.html
+cleantext<-function(t){
+    # Lowercase
+    temp<-tolower(t)
+    #' Remove everything that is not a number or letter (may want to keep more 
+    #' stuff in your actual analyses). 
+    temp<-stringr::str_replace_all(temp,"[^a-zA-Z\\s]", " ")
+    # Shrink down to just one white space
+    temp<-stringr::str_replace_all(temp,"[\\s]+", " ")
+    # Split it
+    #temp<-stringr::str_split(temp, " ")[[1]]
+    # Get rid of trailing "" if necessary
+    indexes<-which(temp == "")
+    if(length(indexes) > 0){
+      temp<-temp[-indexes]
+    } 
+    return(temp)
+}
+#clean text
+ctdf1<-cleantext(cdtdf1)
+ctdf2<-cleantext(cdtdf2)
+ctdf3<-cleantext(cdtdf3)
+ctdf4<-cleantext(cdtdf4)
+
+#remove/convert noise data from major
+ctdf1<-gsub("bs ","",ctdf1)
+ctdf1<-gsub("ms ","",ctdf1)
+ctdf1<-gsub("engineer","engineering",ctdf1)
+ctdf1<-gsub("mechanical eng","engineering",ctdf1)
+ctdf1<-gsub("finance finance","finance",ctdf1)
+ctdf1<-gsub("master ","",ctdf1)
+#remove noise data from platform
+ctdf2<-gsub("surface ","",ctdf2)
+#remove/convert noise data from R level
+ctdf3<-gsub("int ","intermediate ",ctdf3)
+ctdf3<-gsub("intermed ","intermediate ",ctdf3)
+ctdf3<-gsub("beg ","beginner ",ctdf3)
+#remove/convert noise data from other programming
+ctdf4<-gsub("just ","",ctdf4)
+ctdf4<-gsub("some ","",ctdf4)
+ctdf4<-gsub("and ","",ctdf4)
+ctdf4<-gsub("obj c","obj-c",ctdf4)
+ctdf4<-gsub(" c"," c++",ctdf4)
+ctdf4<-gsub("teeny amount of ","",ctdf4)
+
+#reset as data frames
+df1<-data_frame(text=ctdf1)
+df2<-data_frame(text=ctdf2)
+df3<-data_frame(text=ctdf3)
+df4<-data_frame(text=ctdf4)
+#tokenize
+untext1<-df1 %>%
+        unnest_tokens(word, text)
+untext2<-df2 %>%
+        unnest_tokens(word, text)
+untext3<-df3 %>%
+        unnest_tokens(word, text)
+untext4<-df4 %>%
+        unnest_tokens(word, text)
+
+
+#bar graphs
+bg1<-untext1 %>%
+  count(word, sort = TRUE) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n,fill=word)) +
+  geom_col() +
+  xlab(NULL) +
+  ylab("Frequency") +
+  coord_flip() +
+  ggtitle("Majors") +
+  theme(legend.position="none")
+bg2<-untext2 %>%
+  count(word, sort = TRUE) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n,fill=word)) +
+  geom_col() +
+  xlab(NULL) +
+  ylab("Frequency") +
+  coord_flip() +
+  ggtitle("Platforms") +
+  theme(legend.position="none")
+bg3<-untext3 %>%
+  count(word, sort = TRUE) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n,fill=word)) +
+  geom_col() +
+  xlab(NULL) +
+  ylab("Frequency") +
+  coord_flip() +
+  ggtitle("R Proficiency Levels") +
+  theme(legend.position="none")
+bg4<-untext4 %>%
+  count(word, sort = TRUE) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n,fill=word)) +
+  geom_col() +
+  xlab(NULL) +
+  ylab("Frequency") +
+  coord_flip() +
+  ggtitle("Other Proficiencies") +
+  theme(legend.position="none")
+
+#bar graph of majors
+bg1
+#bar graph of platforms
+bg2
+#bar graph of R level
+bg3
+#bar graph of other programming
+bg4
+
+#wordclouds
+#library(RColorBrewer)
+pal1<-brewer.pal(7,"Dark2")
+pal2<-brewer.pal(12,"Paired")
+par(mfcol=c(1,2))
+wordcloud(ctdf1,min.freq=1,max.words=Inf,random.order=F,colors=pal1)
+wordcloud(ctdf4,min.freq=1,max.words=Inf,random.order=F,colors=pal2)
+```
+
+```{r, eval=F}
+##Problem 3
+
+#get data
+library(jsonlite)
+metadata <- fromJSON("https://data.nasa.gov/data.json")
+#metadata sorting
+names(metadata$dataset)
+
+#investigation of object classes
+class(metadata$dataset$description)
+class(metadata$dataset$keyword)
+
+#quick tidying for
+#descriptions
+nasa_desc <- data_frame(id = metadata$dataset$`_id`$`$oid`, 
+                        desc = metadata$dataset$description)
+
+nasa_desc %>% 
+  select(desc) %>% 
+  sample_n(5)
+#keywords
+nasa_keyword <- data_frame(id = metadata$dataset$`_id`$`$oid`, 
+                           keyword = metadata$dataset$keyword) %>%
+  unnest(keyword)
+
+nasa_keyword
+
+#remove stopwords from descriptions
+nasa_desc <- nasa_desc %>% 
+  unnest_tokens(word, desc) %>% 
+  anti_join(stop_words)
+#define more stopwords
+my_stopwords <- data_frame(word = c(as.character(1:10), 
+                                    "v1", "v03", "l2", "l3", "l4", "v5.2.0", 
+                                    "v003", "v004", "v005", "v006", "v7"))
+#remove them
+nasa_desc <- nasa_desc %>% 
+  anti_join(my_stopwords)
+#eliminate the lower case among keywords
+nasa_keyword <- nasa_keyword %>% 
+  mutate(keyword = toupper(keyword))
+
+#exploratory frequencies
+nasa_desc %>%
+  count(word, sort = TRUE)
+nasa_keyword %>% 
+  group_by(keyword) %>% 
+  count(sort = TRUE)
+
+#merge description and keyword by id
+desckey<-merge(nasa_desc,nasa_keyword,by="id")
+head(desckey)
+
+#find description word frequencies by keywords
+desc_by_keyword <- desckey %>%
+  count(keyword, word, sort = TRUE) %>%
+  ungroup()
+desc_by_keyword
+
+#tally sentiment scores
+nasa_sentiments <- desc_by_keyword %>%
+  inner_join(get_sentiments("afinn"), by = "word") %>%
+  group_by(keyword) %>%
+  summarize(score = sum(score * n) / sum(n))
+#plot sentiment scores
+nasa_sentiments %>%
+  mutate(keyword = reorder(keyword, score)) %>%
+  ggplot(aes(keyword, score, fill = score > 0)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  ylab("Average Sentiment Score")
+
+#tally contributions by word
+contributions <- desckey %>%
+  inner_join(get_sentiments("afinn"), by = "word") %>%
+  group_by(word) %>%
+  summarize(occurences = n(),
+            contribution = sum(score))
+contributions
+#plot contributions
+contributions %>%
+  top_n(25, abs(contribution)) %>%
+  mutate(word = reorder(word, contribution)) %>%
+  ggplot(aes(word, contribution, fill = contribution > 0)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip()
+```
