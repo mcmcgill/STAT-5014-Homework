@@ -1,0 +1,83 @@
+---
+title: "Avengers Fatalities"
+output: flexdashboard::flex_dashboard
+---
+    
+Main
+=====================================
+
+Column
+-------------------------------------
+    
+### Graphic of Character Death as Binary
+
+Somewhere on the page would be a way to specify results by Current/Former Member, Gender, Full/Honorary/Probationary/Academy Status, and Range of Time Joined.
+
+```{r}
+```
+   
+Column
+-------------------------------------
+   
+### Graphic of Character Deaths as Count
+
+```{r}
+```   
+ 
+### Graphic of Appearance Count
+
+```{r}
+```
+ 
+### Graphic of Time Since Joining Avengers
+    
+```{r}
+```
+
+
+Individual
+=====================================
+
+Column
+-------------------------------------
+    
+### Table For Selection of Individual Characters by Name/Alias
+
+```{r}
+```
+   
+Column
+-------------------------------------
+
+### Graphic of Deaths
+
+```{r}
+```
+
+### Graphic Highlighting Appearance Count
+
+```{r}
+```
+
+### Graphic Highlighting Time Since Joining
+
+```{r}
+```
+
+Column
+-------------------------------------
+
+### Death Status
+
+```{r}
+```
+
+### Gender, Current/Former Member, and Membership Type 
+
+```{r}
+```
+
+### Character Specific Notes
+
+```{r}
+```
